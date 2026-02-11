@@ -165,9 +165,18 @@ function setupCtrl(){
     const ov=document.getElementById('tov');if(!started){ov.classList.remove('hidden');ov.style.display='flex'}
     if(csDone)return;
     const stk=new Set([16,17,18,19,20,21,22,23]);
-    const bns={'btn-b':1,'btn-a':0,'btn-start':3,'btn-up':4,'btn-down':5,'btn-left':6,'btn-right':7,'btn-l':10,'btn-r':11,'btn-z':12,'btn-cup':23,'btn-cdown':22,'btn-cleft':21,'btn-cright':20};
+    const bns={'btn-b':0,'btn-a':8,'btn-start':3,'btn-up':4,'btn-down':5,'btn-left':6,'btn-right':7,'btn-l':10,'btn-r':11,'btn-z':12,'btn-cup':23,'btn-cdown':22,'btn-cleft':21,'btn-cright':20};
     const bm={};Object.entries(bns).forEach(([n,c])=>{bm[px+n]=c});
-    function doI(c,v){if(isHost&&emu?.gameManager)emu.gameManager.simulateInput(myIdx,c,v);if(!isHost)snd(c,v)}
+    function doI(c,v){
+        if(isHost&&emu){
+            let ok=false;
+            try{if(emu.gameManager?.simulateInput){emu.gameManager.simulateInput(myIdx,c,v);ok=true}}catch(e){}
+            if(!ok)try{if(emu.simulateInput){emu.simulateInput(myIdx,c,v);ok=true}}catch(e){}
+            if(!ok)try{if(window.simulate_input){window.simulate_input(myIdx,c,v);ok=true}}catch(e){}
+            if(!ok)console.warn('No input method found for',myIdx,c,v);
+        }
+        if(!isHost)snd(c,v);
+    }
     Object.entries(bm).forEach(([id,code])=>{
         const b=document.getElementById(id);if(!b)return;const v=stk.has(code)?32767:1;
         const pr=()=>{b.classList.add('pressed');doI(code,v)};
@@ -178,7 +187,7 @@ function setupCtrl(){
         b.addEventListener('mousedown',e=>{e.preventDefault();pr()});b.addEventListener('mouseup',e=>{e.preventDefault();rl()});b.addEventListener('mouseleave',rl);
     });
     // Keyboard
-    const km={"ArrowUp":19,"ArrowDown":18,"ArrowLeft":17,"ArrowRight":16,"w":19,"W":19,"s":18,"S":18,"a":17,"A":17,"d":16,"D":16,"z":1,"Z":1,"x":0,"X":0,"Enter":3,"q":10,"Q":10,"e":11,"E":11,"Shift":12,"i":23,"I":23,"k":22,"K":22,"j":21,"J":21,"l":20,"L":20};
+    const km={"ArrowUp":19,"ArrowDown":18,"ArrowLeft":17,"ArrowRight":16,"w":19,"W":19,"s":18,"S":18,"a":17,"A":17,"d":16,"D":16,"z":0,"Z":0,"x":8,"X":8,"Enter":3,"q":10,"Q":10,"e":11,"E":11,"Shift":12,"i":23,"I":23,"k":22,"K":22,"j":21,"J":21,"l":20,"L":20};
     const kd=new Set();
     document.addEventListener('keydown',e=>{if(km[e.key]!==undefined&&!kd.has(e.key)){e.preventDefault();kd.add(e.key);doI(km[e.key],stk.has(km[e.key])?32767:1)}});
     document.addEventListener('keyup',e=>{if(km[e.key]!==undefined){e.preventDefault();kd.delete(e.key);doI(km[e.key],0)}});
@@ -219,7 +228,14 @@ document.getElementById('mute-btn').addEventListener('click',e=>{if(emu?.gameMan
 document.getElementById('ss-btn').addEventListener('click',()=>{const c=document.querySelector('#game canvas');if(c){const l=document.createElement('a');l.download='pokemon-stadium.png';l.href=c.toDataURL();l.click()}});
 document.getElementById('rst-btn').addEventListener('click',()=>{if(emu?.gameManager?.restart&&confirm('Restart?'))emu.gameManager.restart();sm.classList.remove('show')});
 // Poll
-setInterval(()=>{const ne=window.EJS_emulator;if(ne?.gameManager&&ne!==emu){setupCtrl();document.getElementById('stxt').textContent='Ready!';document.getElementById('sdot').className='sd ok';kv();if(isHost&&pConn)setTimeout(sendStream,2000)}},100);
+setInterval(()=>{const ne=window.EJS_emulator;if(ne?.gameManager&&ne!==emu){setupCtrl();document.getElementById('stxt').textContent='Ready!';document.getElementById('sdot').className='sd ok';kv();
+    // Focus game so inputs work
+    const gd=document.getElementById('game');if(gd)gd.focus();
+    const cv=gd?.querySelector('canvas');if(cv)cv.focus();
+    // Log available methods for debugging
+    console.log('EJS_emulator methods:', Object.keys(ne));
+    console.log('gameManager methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(ne.gameManager)));
+    if(isHost&&pConn)setTimeout(sendStream,2000)}},100);
 // Boot
 async function boot(){
     if(!isHost){document.getElementById('stxt').textContent='Waiting for P1 screen...';document.getElementById('sdot').className='sd wn';return}
